@@ -1,0 +1,390 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Guess 7.1</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050816;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.game {
+  width: 100%;
+  max-width: 480px;
+  padding: 26px 22px;
+  text-align: center;
+  border: 1px solid #00f7ff;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #101a35, #080b19);
+  box-shadow: 0 0 30px #00eaff30;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 34px;
+  color: #00f7ff;
+  text-shadow: 0 0 16px #00d9ff;
+}
+
+.subtitle {
+  color: #a8b7d9;
+  margin-bottom: 22px;
+}
+
+.stats {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.stat {
+  flex: 1;
+  padding: 12px 5px;
+  border: 1px solid #263d68;
+  border-radius: 12px;
+  background: #0b1228;
+}
+
+.stat strong {
+  display: block;
+  margin-top: 6px;
+  color: #00f7ff;
+  font-size: 21px;
+}
+
+#message {
+  min-height: 48px;
+  margin: 18px 0;
+  color: #d9e7ff;
+  line-height: 1.5;
+}
+
+input {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #00f7ff;
+  background: #050b1c;
+  color: white;
+  font-size: 20px;
+  text-align: center;
+  outline: none;
+}
+
+button {
+  padding: 12px 15px;
+  margin: 6px 3px;
+  border: none;
+  border-radius: 10px;
+  background: #00eaff;
+  color: #03101c;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  box-shadow: 0 0 16px #00eaff88;
+}
+
+.secondary {
+  background: #192848;
+  border: 1px solid #385b91;
+  color: white;
+}
+
+button:disabled,
+input:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+#startButton {
+  width: 100%;
+  padding: 16px;
+  margin: 8px 0;
+  font-size: 17px;
+}
+
+#voiceStatus {
+  margin: 12px 0;
+  font-size: 13px;
+  color: #91a9d3;
+}
+
+.credit {
+  margin-top: 25px;
+  padding-top: 16px;
+  border-top: 1px solid #263d68;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #8da4ce;
+  letter-spacing: 1px;
+}
+
+.credit strong { color: #00f7ff; }
+</style>
+</head>
+
+<body>
+<div class="game">
+
+  <h1>NEON GUESS</h1>
+  <div class="subtitle">Version 7.1 · Unlimited Challenge</div>
+
+  <div class="stats">
+    <div class="stat">Score<strong id="score">0</strong></div>
+    <div class="stat">Level<strong id="level">1</strong></div>
+    <div class="stat">Attempts<strong id="attempts">0</strong></div>
+  </div>
+
+  <p id="message">
+    Ready, gamer? Press start to begin your challenge!
+  </p>
+
+  <button id="startButton" onclick="startGame()">
+    START GAME ⚡
+  </button>
+
+  <input
+    id="guessInput"
+    type="number"
+    min="1"
+    max="20"
+    placeholder="Enter your guess"
+    disabled
+  >
+
+  <div>
+    <button id="guessButton" onclick="checkGuess()" disabled>
+      GUESS
+    </button>
+
+    <button class="secondary" onclick="restartGame()">
+      RESTART
+    </button>
+  </div>
+
+  <div>
+    <button class="secondary" id="voiceButton" onclick="toggleVoice()">
+      Voice: ON
+    </button>
+  </div>
+
+  <div id="voiceStatus">No timer · English voice enabled</div>
+
+  <div class="credit">
+    GAME DESIGNED &amp; DEVELOPED BY<br>
+    <strong>SHIVTEJ THOMBARE</strong><br>
+    © 2026 · NEON GUESS<br>
+    MADE WITH PASSION ⚡
+  </div>
+
+</div>
+
+<script>
+let secretNumber;
+let score = 0;
+let level = 1;
+let attempts = 0;
+let gameOver = true;
+let voiceEnabled = true;
+let voices = [];
+
+const message = document.getElementById("message");
+const input = document.getElementById("guessInput");
+const guessButton = document.getElementById("guessButton");
+const startButton = document.getElementById("startButton");
+
+function loadVoices() {
+  if ("speechSynthesis" in window) {
+    voices = speechSynthesis.getVoices();
+  }
+}
+
+if ("speechSynthesis" in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function getEnglishVoice() {
+  loadVoices();
+
+  return (
+    voices.find(v => /en-US/i.test(v.lang) &&
+      /natural|premium|neural/i.test(v.name)) ||
+    voices.find(v => /en-US/i.test(v.lang)) ||
+    voices.find(v => /en-GB/i.test(v.lang)) ||
+    voices.find(v => /en-IN/i.test(v.lang)) ||
+    voices.find(v => /^en/i.test(v.lang)) ||
+    null
+  );
+}
+
+function speak(text) {
+  if (!voiceEnabled || !("speechSynthesis" in window)) return;
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = getEnglishVoice();
+
+  if (voice) utterance.voice = voice;
+
+  utterance.lang = voice ? voice.lang : "en-US";
+  utterance.rate = 1.08;
+  utterance.pitch = 0.95;
+  utterance.volume = 1;
+
+  speechSynthesis.speak(utterance);
+}
+
+function startGame() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+
+  voiceEnabled = true;
+  document.getElementById("voiceButton").textContent = "Voice: ON";
+
+  score = 0;
+  level = 1;
+
+  document.getElementById("score").textContent = score;
+  document.getElementById("level").textContent = level;
+
+  startButton.style.display = "none";
+  newRound();
+
+  speak(
+    "Welcome to Neon Guess! " +
+    "Get ready, gamer. Your challenge starts now! " +
+    "Guess a number from one to twenty. Good luck!"
+  );
+}
+
+function newRound() {
+  secretNumber = Math.floor(Math.random() * (level * 20)) + 1;
+  attempts = 0;
+  gameOver = false;
+
+  input.max = level * 20;
+  input.value = "";
+  input.disabled = false;
+  guessButton.disabled = false;
+
+  document.getElementById("level").textContent = level;
+  document.getElementById("attempts").textContent = attempts;
+
+  message.textContent =
+    "Guess a number from 1 to " + (level * 20) +
+    ". Take your time! There is no timer.";
+
+  input.focus();
+}
+
+function checkGuess() {
+  if (gameOver) return;
+
+  const guess = Number(input.value);
+  const maxNumber = level * 20;
+
+  if (
+    input.value === "" ||
+    !Number.isInteger(guess) ||
+    guess < 1 ||
+    guess > maxNumber
+  ) {
+    message.textContent =
+      "Enter a whole number from 1 to " + maxNumber + ".";
+    speak("Please enter a valid number.");
+    return;
+  }
+
+  attempts++;
+  document.getElementById("attempts").textContent = attempts;
+
+  if (guess === secretNumber) {
+    score += Math.max(10, 50 - attempts * 5);
+    document.getElementById("score").textContent = score;
+
+    gameOver = true;
+    input.disabled = true;
+    guessButton.disabled = true;
+
+    message.textContent =
+      "Correct! Amazing work. Get ready for level " + (level + 1) + "!";
+
+    speak("Correct! Excellent work, gamer!");
+
+    level++;
+
+    setTimeout(() => {
+      if (!gameOver) return;
+
+      document.getElementById("level").textContent = level;
+      newRound();
+      speak("Level " + level + ". Your next challenge begins now!");
+    }, 1400);
+
+  } else if (guess < secretNumber) {
+    message.textContent = "TOO LOW! Try a higher number.";
+    speak("Too low! Go higher. Try again!");
+
+  } else {
+    message.textContent = "TOO HIGH! Try a lower number.";
+    speak("Too high! Go lower. Try again!");
+  }
+
+  input.value = "";
+  input.focus();
+}
+
+function restartGame() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+
+  gameOver = true;
+  input.disabled = true;
+  guessButton.disabled = true;
+
+  startButton.style.display = "block";
+  startButton.textContent = "START GAME ⚡";
+
+  message.textContent = "Ready for another challenge? Press START GAME!";
+  document.getElementById("voiceStatus").textContent =
+    "No timer · English voice enabled";
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+
+  document.getElementById("voiceButton").textContent =
+    voiceEnabled ? "Voice: ON" : "Voice: OFF";
+
+  document.getElementById("voiceStatus").textContent =
+    voiceEnabled ? "No timer · English voice enabled" : "Voice is muted";
+
+  if (!voiceEnabled && "speechSynthesis" in window) {
+    speechSynthesis.cancel();
+  } else if (voiceEnabled && !gameOver) {
+    speak("Voice enabled. Let's play!");
+  }
+}
+
+input.addEventListener("keydown", event => {
+  if (event.key === "Enter") checkGuess();
+});
+</script>
+</body>
+</html>
